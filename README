@@ -1,4 +1,4 @@
-run this test tool by building it and ssueing a commandline like:
+run this test tool by building it and issueing a commandline like:
 
 $ mvn package
 $ java -jar test-ingester-0.0.1-SNAPSHOT.jar http://localhost:8080/fedora/ fedoraAdmin fed 1000 500000
@@ -6,7 +6,7 @@ $ java -jar test-ingester-0.0.1-SNAPSHOT.jar http://localhost:8080/fedora/ fedor
 the command line syntax for the executable class is as following:
 java -jar test-ingester-0.0.1-SNAPSHOT.jar <host> <user> <pass> <num> <size>
 
-host = the foedora host to write to
+host = the fedora host to write to
 user = the fedora username
 pass = the fedora password
 num = the number of datastreams to create
