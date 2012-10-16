@@ -26,7 +26,7 @@ import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.impl.client.DefaultHttpClient;
 
 public class TestIngester {
-	private static final DecimalFormat FORMATTER = new DecimalFormat("#.##");
+	private static final DecimalFormat FORMATTER = new DecimalFormat("000.00");
 	private final DefaultHttpClient client = new DefaultHttpClient();
 
 	private final URI fedoraUri;
@@ -55,14 +55,15 @@ public class TestIngester {
 		int numDatastreams = Integer.parseInt(args[3]);
 		int size = Integer.parseInt(args[4]);
 		TestIngester ingester = null;
+		System.out.println("generating " + numDatastreams + " datastreams with size " + size);
 		try {
 			ingester = new TestIngester(uri, user, pass);
 			String objectId = ingester.ingestObject("test-1");
 			System.out.println("ingested test object");
 			for (int i = 0; i < numDatastreams; i++) {
 				ingester.ingestDatastream(objectId, "ds-" + (i + 1), size);
-				float percent = (float)i+1/ (float)numDatastreams * 100;
-				System.out.print("\b\b\b\b" + FORMATTER.format(percent) + "%");
+				float percent = (float) (i + 1) / (float) numDatastreams * 100f;
+				System.out.print("\r" + FORMATTER.format(percent) + "%");
 			}
 			System.out.println(" - ingest datastreams finished");
 			ingester.updateAllDatastreams(objectId, size);
@@ -91,17 +92,17 @@ public class TestIngester {
 		String xml = IOUtils.toString(resp.getEntity().getContent());
 		get.releaseConnection();
 		Matcher m = Pattern.compile("datastream dsid=\"ds-.*?\"").matcher(xml);
-		int numDatastreams=0;
-		while (m.find()){
+		int numDatastreams = 0;
+		while (m.find()) {
 			numDatastreams++;
 		}
 		m.reset();
-		int count=0;
+		int count = 0;
 		while (m.find()) {
 			String dsId = xml.substring(m.start() + 17, m.end() - 1);
 			updateDatastream(objectId, dsId, size);
-			float percent = (float)++count/ (float)numDatastreams * 100;
-			System.out.print("\b\b\b\b" + FORMATTER.format(percent) + "%");
+			float percent = (float) ++count / (float) numDatastreams * 100f;
+			System.out.print("\r" + FORMATTER.format(percent) + "%");
 		}
 	}
 
@@ -112,7 +113,7 @@ public class TestIngester {
 		put.setEntity(new ByteArrayEntity(getRandomBytes(size)));
 		long start = System.currentTimeMillis();
 		HttpResponse resp = client.execute(put);
-		IOUtils.write((System.currentTimeMillis() - start) + "\n", updateOut); 
+		IOUtils.write((System.currentTimeMillis() - start) + "\n", updateOut);
 		put.releaseConnection();
 		if (resp.getStatusLine().getStatusCode() != 200) {
 			throw new Exception("Unabel to update datastream " + dsId
@@ -129,7 +130,7 @@ public class TestIngester {
 		post.setEntity(new ByteArrayEntity(getRandomBytes(size)));
 		long start = System.currentTimeMillis();
 		HttpResponse resp = client.execute(post);
-		IOUtils.write((System.currentTimeMillis() - start) + "\n", ingestOut); 
+		IOUtils.write((System.currentTimeMillis() - start) + "\n", ingestOut);
 		post.releaseConnection();
 		if (resp.getStatusLine().getStatusCode() != 201) {
 			throw new Exception("Unable to ingest datastream " + label
