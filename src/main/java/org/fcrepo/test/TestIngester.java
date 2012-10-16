@@ -116,7 +116,7 @@ public class TestIngester {
 		IOUtils.write((System.currentTimeMillis() - start) + "\n", updateOut);
 		put.releaseConnection();
 		if (resp.getStatusLine().getStatusCode() != 200) {
-			throw new Exception("Unabel to update datastream " + dsId
+			throw new Exception("Unable to update datastream " + dsId
 					+ ". Fedora returned " + resp.getStatusLine());
 		}
 	}
@@ -125,7 +125,7 @@ public class TestIngester {
 			throws Exception {
 		HttpPost post = new HttpPost(fedoraUri.toASCIIString() + "/objects/"
 				+ objectId + "/datastreams/" + label
-				+ "?versionable=false&controlGroup=M");
+				+ "?versionable=true&controlGroup=M");
 		post.setHeader("Content-Type", "application/octet-stream");
 		post.setEntity(new ByteArrayEntity(getRandomBytes(size)));
 		long start = System.currentTimeMillis();
