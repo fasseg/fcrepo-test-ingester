@@ -1,10 +1,12 @@
 package org.fcrepo.test;
 
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
 import java.security.Principal;
+import java.text.DecimalFormat;
 import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -24,11 +26,18 @@ import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.impl.client.DefaultHttpClient;
 
 public class TestIngester {
-	private final URI fedoraUri;
+	private static final DecimalFormat FORMATTER = new DecimalFormat("#.##");
 	private final DefaultHttpClient client = new DefaultHttpClient();
 
-	public TestIngester(String fedoraUri, String user, String pass) {
+	private final URI fedoraUri;
+	private final OutputStream ingestOut;
+	private final OutputStream updateOut;
+
+	public TestIngester(String fedoraUri, String user, String pass)
+			throws IOException {
 		super();
+		ingestOut = new FileOutputStream("ingest.log");
+		updateOut = new FileOutputStream("update.log");
 		if (fedoraUri.charAt(fedoraUri.length() - 1) == '/') {
 			fedoraUri = fedoraUri.substring(0, fedoraUri.length() - 1);
 		}
@@ -43,27 +52,37 @@ public class TestIngester {
 		String uri = args[0];
 		String user = args[1];
 		String pass = args[2];
-		int numDatatstreams = Integer.parseInt(args[3]);
+		int numDatastreams = Integer.parseInt(args[3]);
 		int size = Integer.parseInt(args[4]);
-		TestIngester ingester = new TestIngester(uri, user, pass);
+		TestIngester ingester = null;
 		try {
+			ingester = new TestIngester(uri, user, pass);
 			String objectId = ingester.ingestObject("test-1");
 			System.out.println("ingested test object");
-			for (int i = 0; i < numDatatstreams; i++) {
+			for (int i = 0; i < numDatastreams; i++) {
 				ingester.ingestDatastream(objectId, "ds-" + (i + 1), size);
+				float percent = (float)i+1/ (float)numDatastreams * 100;
+				System.out.print("\b\b\b\b" + FORMATTER.format(percent) + "%");
 			}
-			System.out.println("ingested datastreams");
+			System.out.println(" - ingest datastreams finished");
 			ingester.updateAllDatastreams(objectId, size);
-			System.out.println("updated datastreams");
+			System.out.println(" - update datastreams finished");
 		} catch (Exception e) {
 			e.printStackTrace();
+		} finally {
+			ingester.shutdown();
 		}
+	}
+
+	private void shutdown() {
+		IOUtils.closeQuietly(ingestOut);
+		IOUtils.closeQuietly(updateOut);
 	}
 
 	private void updateAllDatastreams(String objectId, int size)
 			throws Exception {
 		HttpGet get = new HttpGet(this.fedoraUri + "/objects/" + objectId
-				+ "/datastreams?format=xml");
+				+ "/datastreams?format=xml&versionable=false");
 		HttpResponse resp = client.execute(get);
 		if (resp.getStatusLine().getStatusCode() != 200) {
 			throw new Exception("Unable to get object with id " + objectId
@@ -72,21 +91,32 @@ public class TestIngester {
 		String xml = IOUtils.toString(resp.getEntity().getContent());
 		get.releaseConnection();
 		Matcher m = Pattern.compile("datastream dsid=\"ds-.*?\"").matcher(xml);
+		int numDatastreams=0;
+		while (m.find()){
+			numDatastreams++;
+		}
+		m.reset();
+		int count=0;
 		while (m.find()) {
 			String dsId = xml.substring(m.start() + 17, m.end() - 1);
 			updateDatastream(objectId, dsId, size);
+			float percent = (float)++count/ (float)numDatastreams * 100;
+			System.out.print("\b\b\b\b" + FORMATTER.format(percent) + "%");
 		}
 	}
 
-	private void updateDatastream(String objId,String dsId, int size) throws Exception{
-		HttpPut put = new HttpPut(this.fedoraUri + "/objects/" + objId + "/datastreams/" + dsId);
+	private void updateDatastream(String objId, String dsId, int size)
+			throws Exception {
+		HttpPut put = new HttpPut(this.fedoraUri + "/objects/" + objId
+				+ "/datastreams/" + dsId);
 		put.setEntity(new ByteArrayEntity(getRandomBytes(size)));
 		long start = System.currentTimeMillis();
 		HttpResponse resp = client.execute(put);
-		System.out.println((System.currentTimeMillis() - start));
+		IOUtils.write((System.currentTimeMillis() - start) + "\n", updateOut); 
 		put.releaseConnection();
-		if (resp.getStatusLine().getStatusCode() != 200){
-			throw new Exception("Unabel to update datastream " + dsId + ". Fedora returned " + resp.getStatusLine());
+		if (resp.getStatusLine().getStatusCode() != 200) {
+			throw new Exception("Unabel to update datastream " + dsId
+					+ ". Fedora returned " + resp.getStatusLine());
 		}
 	}
 
@@ -99,12 +129,12 @@ public class TestIngester {
 		post.setEntity(new ByteArrayEntity(getRandomBytes(size)));
 		long start = System.currentTimeMillis();
 		HttpResponse resp = client.execute(post);
+		IOUtils.write((System.currentTimeMillis() - start) + "\n", ingestOut); 
 		post.releaseConnection();
 		if (resp.getStatusLine().getStatusCode() != 201) {
 			throw new Exception("Unable to ingest datastream " + label
 					+ " fedora returned " + resp.getStatusLine());
 		}
-//		System.out.println((System.currentTimeMillis() - start));
 	}
 
 	private byte[] getRandomBytes(int size) {
